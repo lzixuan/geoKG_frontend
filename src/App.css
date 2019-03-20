@@ -1,3 +1,22 @@
+@import '~antd/dist/antd.css';
+
+#resultMap {
+  width: 90%;
+  height: 300px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.logo {
+  width: 120px;
+  height: 30px;
+  color: #eee;
+  font-size: 20px;
+  margin: 16px 28px 16px 0;
+  line-height: 30px;
+  float: left;
+}
+
 .App {
   text-align: center;
 }
