@@ -13,41 +13,11 @@ import Hello from './Hello';
 import Overview from './Overview';
 import * as serviceWorker from './serviceWorker';
 
-const {
-    Header, Content,
-  } = Layout;
-
-/*export default class entry extends Component{
-    render(){
-        return (
-            <Layout className="layout">
-                <Header>
-                    <div className="logo">知行</div>
-                </Header>
-                <Content style={{
-                    background: '#fff', padding: 24, margin: 0, minHeight: 800,
-                }}>
-                    <Row>
-                        <Router>
-                            <div>
-                                <Route exact path="/" component={Hello} />  
-                                <Route exact path="/resident" component={App} />                                                                                                                                                                                                                                                                                                                                                                                                                                  
-                            </div>
-                        </Router>
-                        
-                    </Row>
-                </Content>
-            </Layout>
-            
-        )
-    }
-}*/
-
 ReactDOM.render((
     <Router>
         <div>
             <Route exact path="/" component={Hello} />  
-            <Route exact path="/resident" component={App} />
+            <Route exact path="/recommend" component={App} />
             <Route exact path="/overview" component={Overview} />                                                                                                                                                                                                                                                                                                                                                                                                                                 
         </div>
     </Router>

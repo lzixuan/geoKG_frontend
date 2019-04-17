@@ -1,10 +1,12 @@
 import React, { Component } from 'react';
 import Button from 'antd/lib/button';
 import './App.css';
+import cascaderData from './cascaderData';
 import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col } from 'antd';
 import * as d3 from 'd3';
 import BMap from 'BMap';
 import $ from 'jquery';
+import { Link, Router, NavLink } from 'react-router-dom';
 
 const Option = Select.Option;
 
@@ -45,21 +47,8 @@ var resData = [{
 }];
 
 //list of places
-const places = [{
-  value: 'haidian',
-  label: '海淀区',
-  children: [{
-    value: 'wudaokou',
-    label: '五道口',
-  }],
-}, {
-  value: 'chaoyang',
-  label: '朝阳区',
-  children: [{
-    value: 'sanyuanqiao',
-    label: '三元桥',
-  }],
-}];
+var places = [];
+
 //list of topics
 const topics = ['美食', '购物'];
 
@@ -146,6 +135,30 @@ class App extends Component {
     }, "json");
   }
 
+  //load the json data
+  componentWillMount(){
+    const qus = Object.keys(cascaderData);
+    for (let i in qus){
+      const key = qus[i];
+      const placeList = [];
+      if (cascaderData[key].length > 0){
+        for (let j in cascaderData[key]){
+          const obj = {
+            'value':cascaderData[key][j],
+            'label':cascaderData[key][j]
+          }
+          placeList.push(obj);
+        }
+      }
+      const obj = {
+        'value':key,
+        'label':key,
+        'children':placeList
+      }
+      places.push(obj);
+    }
+  }
+
   //for baiduMap Test
   componentDidMount () {
     var map = new BMap.Map("resultMap"); // 创建Map实例
@@ -172,22 +185,21 @@ class App extends Component {
           <Menu
             theme="dark"
             mode="horizontal"
-            defaultSelectedKeys={['1']}
             style={{ lineHeight: '64px' }}
           >
-            <Menu.Item key="1">地点推荐</Menu.Item>
-            <Menu.Item key="2">地点概览</Menu.Item>
+            <Menu.Item><Link to="/">回到主页</Link></Menu.Item>
           </Menu>
         </Header>
         <Layout>
-          <Sider width={300} height={800} style={{ background: '#fff' }}>
-            <Card style={{ width: 300, height:800}}>
+          <Sider width={350} height={800} style={{ background: '#fff' }}>
+            <Card style={{ width: 350, height:800}}>
               <Divider>Controls</Divider>
               <div>
                 交通方式：
                 <Radio.Group defaultValue="a" buttonStyle="solid" onChange={onMeansChange}>
                   <Radio.Button value="a">公共汽车</Radio.Button>
                   <Radio.Button value="b">地铁</Radio.Button>
+                  <Radio.Button value='c'>不限</Radio.Button>
                 </Radio.Group> 
               </div>
               <br></br>
