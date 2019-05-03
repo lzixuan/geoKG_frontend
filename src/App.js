@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Button from 'antd/lib/button';
 import './App.css';
 import cascaderData from './cascaderData';
-import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col } from 'antd';
+import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col, Pagination } from 'antd';
 import * as d3 from 'd3';
 import BMap from 'BMap';
 import $ from 'jquery';
@@ -14,20 +14,7 @@ const {
   Header, Sider, Content,
 } = Layout;
 
-var means, transfer, stop, selectedTopics;
-const resColumns = [{
-  title: '区域',
-  dataIndex: 'place',
-}, {
-  title: '城区',
-  dataIndex: 'cityRegion',
-}, {
-  title: '推荐排序',
-  dataIndex: 'rank',
-}, {
-  title: '距离',
-  dataIndex: 'distance',
-}];
+var means = "bus", transfer = 1, time = 15, selectedTopics, place;
 var resData = [{
   key: '1',
   place: '五道口',
@@ -50,19 +37,22 @@ var resData = [{
 var places = [];
 
 //list of topics
-const topics = ['美食', '购物'];
+const topics = ['居民区','美食','旅游','娱乐','运动','酒店','学校','培训机构',
+  '医院', '工作','购物','交通','生活保障'];
 
 function onMeansChange(e) {
   //console.log(`radio checked:${e.target.value}`);
   means = e.target.value;
 }
-function onTransferChange(value) {
+function onTransferChange(e) {
   //console.log('onTransferChange: ', value);
-  transfer = value;
+  transfer = e.target.value;
+  //console.log(transfer);
 };
-function onStopChange(value) {
+function onTimeChange(value) {
   //console.log('onTransferChange: ', value);
-  stop = value;
+  time = value;
+  //console.log(value);
 };
 
 
@@ -72,16 +62,24 @@ class App extends Component {
     selectedItems:[],
     selectedRowKeys:[],
     tableData:[],
+    sortedInfo:null,
   };
 
   onPlaceChange = (value, selectedOptions) => {
     this.setState({
       text: selectedOptions.map(o => o.label).join(', '),
     });
+    place = selectedOptions[1].label;
   }
   onTopicChange = (selectedItems) => {
-    this.setState({selectedItems});
-    selectedTopics = selectedItems;
+    console.log(selectedItems);
+    if (selectedItems.length <= 3){
+      this.setState({selectedItems});
+      selectedTopics = selectedItems;
+    }
+    else{
+      alert("至多选择三个需求！");
+    }
     //console.log(selectedTopics);
   };
   selectRow = (record) => {
@@ -123,15 +121,35 @@ class App extends Component {
   onSelectedRowKeysChange = (selectedRowKeys) => {
     this.setState({ selectedRowKeys });
   }
+  tableChange = (pagination, filters, sorter) => {
+    this.setState({
+      sortedInfo: sorter,
+    });
+  }
   onClickSubmit = (event) => {
     var _this = this;
-    $.post("http://localhost:5000/getSearch", function(data, status){
-      console.log(status);
+    //juege whether parameters are legal
+    if (typeof(place) == "undefined"){
+      alert("请选择地点！");
+      return;
+    }
+    if (this.state.selectedItems.length == 0){
+      alert("请选择需求！");
+      return;
+    }
+    var params = {
+      "means": means,
+      "place": place,
+      "transfer": transfer,
+      "time": time,
+      "topics": JSON.stringify(this.state.selectedItems)
+    };
+    $.post("http://localhost:5000/getSearch", params, function(data, status){
+      //console.log(status);
       console.log(data);
       if (!data || data.length == 0)
         return;
-      console.log(data);
-      _this.setState({ tableData: resData });
+      _this.setState({ tableData: data['places'] });
     }, "json");
   }
 
@@ -171,6 +189,8 @@ class App extends Component {
   render() {
     const { selectedItems } = this.state;
     const filteredTopics = topics.filter(o => !selectedItems.includes(o));
+    let { sortedInfo } = this.state;
+    sortedInfo = sortedInfo || {};
     //for table
     const { selectedRowKeys } = this.state;
     /*const rowSelection = {
@@ -178,10 +198,28 @@ class App extends Component {
       selectedRowKeys,
       onChange: this.onSelectedRowKeysChange,
     };*/
+    const resColumns = [{
+      title: '区域',
+      dataIndex: 'name',
+    }, {
+      title: '城区',
+      dataIndex: 'qu',
+    }, {
+      title: '推荐排序',
+      dataIndex: 'rank',
+      defaultSortOrder: 'ascend',
+      sorter: (a, b) => a.rank - b.rank,
+      sortOrder: sortedInfo.columnKey === 'rank' && sortedInfo.order,
+    }, {
+      title: '行程时间',
+      dataIndex: 'time',
+      sorter: (a, b) => a.time - b.time,
+      sortOrder: sortedInfo.columnKey === 'time' && sortedInfo.order,
+    }];
     return (
       <Layout>
         <Header className="header">
-          <div className="logo">知行</div>
+          <div className="logo">地点推荐</div>
           <Menu
             theme="dark"
             mode="horizontal"
@@ -196,10 +234,10 @@ class App extends Component {
               <Divider>Controls</Divider>
               <div>
                 交通方式：
-                <Radio.Group defaultValue="a" buttonStyle="solid" onChange={onMeansChange}>
-                  <Radio.Button value="a">公共汽车</Radio.Button>
-                  <Radio.Button value="b">地铁</Radio.Button>
-                  <Radio.Button value='c'>不限</Radio.Button>
+                <Radio.Group defaultValue="bus" buttonStyle="solid" onChange={onMeansChange}>
+                  <Radio.Button value="bus">公共汽车</Radio.Button>
+                  <Radio.Button value="subway">地铁</Radio.Button>
+                  <Radio.Button value='any'>不限</Radio.Button>
                 </Radio.Group> 
               </div>
               <br></br>
@@ -216,15 +254,18 @@ class App extends Component {
               <br></br>
               <div id="transferSlider">
                 <span>
-                  最大中转次数（0-3）：
-                  <Slider defaultValue={0} onChange={onTransferChange} max={3}>
-                  </Slider>
+                  是否允许中转：
+                  <Radio.Group defaultValue={1} buttonStyle="solid" onChange={onTransferChange}>
+                    <Radio.Button value={1}>否</Radio.Button>
+                    <Radio.Button value={2}>是</Radio.Button>
+                  </Radio.Group>
                 </span>
               </div>
+              <br></br>
               <div id="stopSlider">
                 <span>
-                  最大站数（0-20）：
-                  <Slider defaultValue={0} onChange={onStopChange} max={20}>
+                  可接受的路程耗费时间（15-60分钟）：
+                  <Slider defaultValue={15} onChange={onTimeChange} min={15} max={60}>
                   </Slider>
                 </span>
               </div>
@@ -264,11 +305,13 @@ class App extends Component {
                   //rowSelection={rowSelection}
                   columns={resColumns}
                   dataSource={this.state.tableData}
+                  onChange={this.tableChange}
                   onRow={(record) => ({
                     onClick: () => {
                       this.selectRow(record);
                     },
                   })}
+                  size={'middle'}
                   />
                 </Col>
                 <Col span={12}>

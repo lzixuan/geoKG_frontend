@@ -12,7 +12,7 @@ export default class Hello extends Component{
         return (
             <Layout className="layout">
                 <Header>
-                    <div className="logo">地点推荐</div>
+                    <div className="logo">知行</div>
                 </Header>
                 <Content style={{
                     background: '#fff', padding: 24, margin: 0, minHeight: 800,
