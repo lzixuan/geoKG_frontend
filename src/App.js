@@ -14,7 +14,7 @@ const {
   Header, Sider, Content,
 } = Layout;
 
-var means = "bus", transfer = 1, time = 15, selectedTopics, place;
+var means = "bus", transfer = 1, time = 15, selectedTopics, place, map, currentLat, currentLng;
 var resData = [{
   key: '1',
   place: '五道口',
@@ -68,12 +68,58 @@ class App extends Component {
     weightedScore: [],
     currentPlace:[],
   };
+  //load the json data
+  componentWillMount() {
+    const qus = Object.keys(cascaderData);
+    for (let i in qus) {
+      const key = qus[i];
+      const placeList = [];
+      if (cascaderData[key].length > 0) {
+        for (let j in cascaderData[key]) {
+          const obj = {
+            'value': cascaderData[key][j],
+            'label': cascaderData[key][j]
+          }
+          placeList.push(obj);
+        }
+      }
+      const obj = {
+        'value': key,
+        'label': key,
+        'children': placeList
+      }
+      places.push(obj);
+    }
+  }
 
+  //for baiduMap Test
+  componentDidMount() {
+    map = new BMap.Map("resultMap"); // 创建Map实例
+    map.centerAndZoom(new BMap.Point(116.416, 39.914), 12); // 初始化地图,设置中心点坐标和地图级别
+    map.addControl(new BMap.MapTypeControl()); //添加地图类型控件
+    map.setCurrentCity("北京"); // 设置地图显示的城市 此项是必须设置的
+    map.enableScrollWheelZoom(true); //开启鼠标滚轮缩放
+  }
   onPlaceChange = (value, selectedOptions) => {
     this.setState({
       text: selectedOptions.map(o => o.label).join(', '),
     });
     place = selectedOptions[1].label;
+    var params = {"place":place};
+    $.post("http://localhost:5000/coordinate", params, function (data, status) {
+      //console.log(status);
+      console.log(data);
+      if (!data)
+        return;
+      currentLat = data['lat'];
+      currentLng = data['lng'];
+      map.clearOverlays();
+      var myIcon = new BMap.Icon("./icon_gcoding2.png", new BMap.Size(45, 46), {
+        anchor: new BMap.Size(22, 46)
+      });
+      var marker = new BMap.Marker(new BMap.Point(currentLng, currentLat), {icon: myIcon});
+      map.addOverlay(marker);
+    }, "json");
   }
   onTopicChange = (selectedItems) => {
     console.log(selectedItems);
@@ -107,6 +153,14 @@ class App extends Component {
       weightedScore: weightedScore_temp,
       currentPlace: record.name,
     })
+    map.clearOverlays();
+    var myIcon = new BMap.Icon("./icon_gcoding2.png", new BMap.Size(45, 46), {
+      anchor: new BMap.Size(22, 46)
+    });
+    var marker1 = new BMap.Marker(new BMap.Point(currentLng, currentLat), {icon: myIcon});
+    map.addOverlay(marker1);
+    var marker2 = new BMap.Marker(new BMap.Point(record.lng, record.lat));
+    map.addOverlay(marker2);
     /*d3.select('#pieSVG')
       .remove();
     var dataset = [30, 10, 43, 55, 13];
@@ -168,71 +222,7 @@ class App extends Component {
       _this.setState({ tableData: data['places'] });
     }, "json");
   }
-  /*ScoreComponent = () =>{
-    <div>
-      
-    </div>
-    this.state.scores.map((item, index)=>{
-      var score = "主题显著度：" + String(item.topic*100) 
-      return (
-        <Row>
-          {score}
-          好评度：
-          <Progress
-            type="circle"
-            percent={Math.round(item.posRate * 100)}
-            strokeColor={{
-              '0%':'#ee0000',
-              '100%':'#87d068'
-            }}
-            width={100}
-          >
-          </Progress>
-        </Row>
-      );
-    });
-    this.state.weightedScore.map((item, index)=>{
-      var weightedScore = "综合评分：" + String(item * 100);
-      return (
-        <Row>
-          {weightedScore}
-        </Row>
-      );
-    });
-  }*/
-  //load the json data
-  componentWillMount() {
-    const qus = Object.keys(cascaderData);
-    for (let i in qus) {
-      const key = qus[i];
-      const placeList = [];
-      if (cascaderData[key].length > 0) {
-        for (let j in cascaderData[key]) {
-          const obj = {
-            'value': cascaderData[key][j],
-            'label': cascaderData[key][j]
-          }
-          placeList.push(obj);
-        }
-      }
-      const obj = {
-        'value': key,
-        'label': key,
-        'children': placeList
-      }
-      places.push(obj);
-    }
-  }
-
-  //for baiduMap Test
-  componentDidMount() {
-    var map = new BMap.Map("resultMap"); // 创建Map实例
-    map.centerAndZoom(new BMap.Point(116.404, 39.915), 11); // 初始化地图,设置中心点坐标和地图级别
-    map.addControl(new BMap.MapTypeControl()); //添加地图类型控件
-    map.setCurrentCity("北京"); // 设置地图显示的城市 此项是必须设置的
-    map.enableScrollWheelZoom(true); //开启鼠标滚轮缩放
-  }
-
+  
   render() {
     const { selectedItems } = this.state;
     const { scores, posRate, weightedScore } = this.state;
