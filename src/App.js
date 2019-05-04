@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Button from 'antd/lib/button';
 import './App.css';
 import cascaderData from './cascaderData';
-import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col, Pagination } from 'antd';
+import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col, Progress } from 'antd';
 import * as d3 from 'd3';
 import BMap from 'BMap';
 import $ from 'jquery';
@@ -37,8 +37,8 @@ var resData = [{
 var places = [];
 
 //list of topics
-const topics = ['居民区','美食','旅游','娱乐','运动','酒店','学校','培训机构',
-  '医院', '工作','购物','交通','生活保障'];
+const topics = ['居民区', '美食', '旅游', '娱乐', '运动', '酒店', '学校', '培训机构',
+  '医院', '工作', '购物', '交通', '生活保障'];
 
 function onMeansChange(e) {
   //console.log(`radio checked:${e.target.value}`);
@@ -59,10 +59,14 @@ function onTimeChange(value) {
 class App extends Component {
   state = {
     text: '点击右边链接',
-    selectedItems:[],
-    selectedRowKeys:[],
-    tableData:[],
-    sortedInfo:null,
+    selectedItems: [],
+    selectedRowKeys: [],
+    tableData: [],
+    sortedInfo: null,
+    display_score: 'none',
+    scores: [],
+    weightedScore: [],
+    currentPlace:[],
   };
 
   onPlaceChange = (value, selectedOptions) => {
@@ -73,11 +77,11 @@ class App extends Component {
   }
   onTopicChange = (selectedItems) => {
     console.log(selectedItems);
-    if (selectedItems.length <= 3){
-      this.setState({selectedItems});
+    if (selectedItems.length <= 3) {
+      this.setState({ selectedItems });
       selectedTopics = selectedItems;
     }
-    else{
+    else {
       alert("至多选择三个需求！");
     }
     //console.log(selectedTopics);
@@ -91,7 +95,19 @@ class App extends Component {
     }
     this.setState({ selectedRowKeys });*/
     console.log(record);
-    d3.select('#pieSVG')
+    var scores_temp = [];
+    var weightedScore_temp = [];
+    var i;
+    for (i = 0; i < record.topic.length; i++) {
+      scores_temp.push({ topic: record.topic[i], posRate: record.posRate[i] })
+    }
+    weightedScore_temp.push(record.score);
+    this.setState({
+      scores: scores_temp,
+      weightedScore: weightedScore_temp,
+      currentPlace: record.name,
+    })
+    /*d3.select('#pieSVG')
       .remove();
     var dataset = [30, 10, 43, 55, 13];
     var width = 300;
@@ -116,7 +132,7 @@ class App extends Component {
         .attr("fill", function(d, i){
           return color(i);
         })
-        .attr("d", arc);
+        .attr("d", arc);*/
   }
   onSelectedRowKeysChange = (selectedRowKeys) => {
     this.setState({ selectedRowKeys });
@@ -129,11 +145,11 @@ class App extends Component {
   onClickSubmit = (event) => {
     var _this = this;
     //juege whether parameters are legal
-    if (typeof(place) == "undefined"){
+    if (typeof (place) == "undefined") {
       alert("请选择地点！");
       return;
     }
-    if (this.state.selectedItems.length == 0){
+    if (this.state.selectedItems.length == 0) {
       alert("请选择需求！");
       return;
     }
@@ -144,7 +160,7 @@ class App extends Component {
       "time": time,
       "topics": JSON.stringify(this.state.selectedItems)
     };
-    $.post("http://localhost:5000/getSearch", params, function(data, status){
+    $.post("http://localhost:5000/getSearch", params, function (data, status) {
       //console.log(status);
       console.log(data);
       if (!data || data.length == 0)
@@ -152,33 +168,64 @@ class App extends Component {
       _this.setState({ tableData: data['places'] });
     }, "json");
   }
-
+  /*ScoreComponent = () =>{
+    <div>
+      
+    </div>
+    this.state.scores.map((item, index)=>{
+      var score = "主题显著度：" + String(item.topic*100) 
+      return (
+        <Row>
+          {score}
+          好评度：
+          <Progress
+            type="circle"
+            percent={Math.round(item.posRate * 100)}
+            strokeColor={{
+              '0%':'#ee0000',
+              '100%':'#87d068'
+            }}
+            width={100}
+          >
+          </Progress>
+        </Row>
+      );
+    });
+    this.state.weightedScore.map((item, index)=>{
+      var weightedScore = "综合评分：" + String(item * 100);
+      return (
+        <Row>
+          {weightedScore}
+        </Row>
+      );
+    });
+  }*/
   //load the json data
-  componentWillMount(){
+  componentWillMount() {
     const qus = Object.keys(cascaderData);
-    for (let i in qus){
+    for (let i in qus) {
       const key = qus[i];
       const placeList = [];
-      if (cascaderData[key].length > 0){
-        for (let j in cascaderData[key]){
+      if (cascaderData[key].length > 0) {
+        for (let j in cascaderData[key]) {
           const obj = {
-            'value':cascaderData[key][j],
-            'label':cascaderData[key][j]
+            'value': cascaderData[key][j],
+            'label': cascaderData[key][j]
           }
           placeList.push(obj);
         }
       }
       const obj = {
-        'value':key,
-        'label':key,
-        'children':placeList
+        'value': key,
+        'label': key,
+        'children': placeList
       }
       places.push(obj);
     }
   }
 
   //for baiduMap Test
-  componentDidMount () {
+  componentDidMount() {
     var map = new BMap.Map("resultMap"); // 创建Map实例
     map.centerAndZoom(new BMap.Point(116.404, 39.915), 11); // 初始化地图,设置中心点坐标和地图级别
     map.addControl(new BMap.MapTypeControl()); //添加地图类型控件
@@ -188,6 +235,7 @@ class App extends Component {
 
   render() {
     const { selectedItems } = this.state;
+    const { scores, posRate, weightedScore } = this.state;
     const filteredTopics = topics.filter(o => !selectedItems.includes(o));
     let { sortedInfo } = this.state;
     sortedInfo = sortedInfo || {};
@@ -230,7 +278,7 @@ class App extends Component {
         </Header>
         <Layout>
           <Sider width={350} height={800} style={{ background: '#fff' }}>
-            <Card style={{ width: 350, height:800}}>
+            <Card style={{ width: 350, height: 800 }}>
               <Divider>Controls</Divider>
               <div>
                 交通方式：
@@ -238,7 +286,7 @@ class App extends Component {
                   <Radio.Button value="bus">公共汽车</Radio.Button>
                   <Radio.Button value="subway">地铁</Radio.Button>
                   <Radio.Button value='any'>不限</Radio.Button>
-                </Radio.Group> 
+                </Radio.Group>
               </div>
               <br></br>
               <div id="PlaceSelector">
@@ -302,16 +350,16 @@ class App extends Component {
               <Row>
                 <Col span={12}>
                   <Table
-                  //rowSelection={rowSelection}
-                  columns={resColumns}
-                  dataSource={this.state.tableData}
-                  onChange={this.tableChange}
-                  onRow={(record) => ({
-                    onClick: () => {
-                      this.selectRow(record);
-                    },
-                  })}
-                  size={'middle'}
+                    //rowSelection={rowSelection}
+                    columns={resColumns}
+                    dataSource={this.state.tableData}
+                    onChange={this.tableChange}
+                    onRow={(record) => ({
+                      onClick: () => {
+                        this.selectRow(record);
+                      },
+                    })}
+                    size={'middle'}
                   />
                 </Col>
                 <Col span={12}>
@@ -320,12 +368,27 @@ class App extends Component {
                 </Col>
               </Row>
             </div>
-            <Row>
-              <Col span={12}>
-                  <div id="topicChart">
-                  </div>
-              </Col>
-            </Row>
+            <div>
+              <p>{this.state.currentPlace + "评分信息："}</p>
+              {this.state.scores.map((item, index) => (
+                <Row key={'topicScore'+String(index)}>
+                  {this.state.selectedItems[index] + "显著度评分：" + String((item.topic * 10000).toFixed(2))}
+                  &nbsp;&nbsp;
+                  好评度：
+                    <Progress
+                    type="circle"
+                    percent={Math.round(item.posRate * 100)}
+                    width={40}
+                  >
+                  </Progress>
+                </Row>
+              ))}
+              {this.state.weightedScore.map(item => (
+                <Row key={'totalScore'}>
+                  {"综合评分：" + String((item * 10000).toFixed(2))}
+                </Row>
+              ))}
+            </div>
           </Content>
         </Layout>
       </Layout>

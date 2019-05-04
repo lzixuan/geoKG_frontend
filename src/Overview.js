@@ -24,6 +24,9 @@ function onTopicChange(value) {
     topic = value;
 }
 export default class Overview extends Component{
+    state = {
+        display_sider:'none',
+      };
     //load the json data
     componentWillMount(){
         const qus = Object.keys(cascaderData);
@@ -142,7 +145,7 @@ export default class Overview extends Component{
                     background: '#fff', padding: 24, margin: 0, minHeight: 800,
                 }}>
                 </Content>
-                <Sider width={350} height={800} style={{ background: '#fff', display: 'None' }}>
+                <Sider width={350} height={800} style={{ background: '#fff', display: 'none' }}>
                     <Card style={{ width: 350, height:800}}>
                         <Divider>主题</Divider>
                     </Card>
