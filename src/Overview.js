@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import Button from 'antd/lib/button';
 import './Overview.css';
-import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col, Form } from 'antd';
+import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col, Form, Progress } from 'antd';
 import * as d3 from 'd3';
 import BMap from 'BMap';
 import $ from 'jquery';
@@ -14,6 +14,9 @@ const {
 const Option = Select.Option;
 
 var places = [];
+//list of topics
+const topics = ['居民区', '美食', '旅游', '娱乐', '运动', '酒店', '学校', '培训机构',
+  '医院', '工作', '购物', '交通', '生活保障'];
 
 var means = 'bus', topic = '居民区', place;
 function onMeansChange(e) {
@@ -61,6 +64,11 @@ export default class Overview extends Component {
         tableData: [],
         sortedInfo: null,
         currentPlace: [],
+        currentDistance: [],
+        currentQu: [],
+        currentTopic: [],
+        currentPosRate: [],
+        currentCount: [],
     };
     tableChange = (pagination, filters, sorter) => {
         this.setState({
@@ -151,7 +159,44 @@ export default class Overview extends Component {
                 .attr("r", 20)
                 .style("fill", "steelblue")
                 .on("click", function (d, i) {
-                    _this.setState({currentPlace:d.name});
+                    _this.setState({ currentPlace: d.name });
+                    _this.setState({
+                        currentDistance: [],
+                        currentQu: [],
+                        currentTopic: [],
+                        currentPosRate: [],
+                        currentCount: [],
+                    });
+                    var params = {
+                        "place": d.name,
+                    };
+                    var outerData = data;
+                    $.post("http://localhost:5000/detail", params, function (data, status) {
+                        if (!data || data.length == 0)
+                            return;
+                        var tempTopic = [], tempPosRate = [], tempDistance, tempCount;
+                        for (var i = 0; i < 13; i++){
+                            tempTopic.push(data['topic'+String(i+1)]);
+                            tempPosRate.push(data['posRate'+String(i+1)]);
+                        }
+                        for (let i in outerData['link']){
+                            if(outerData['link'][i]['target']['id'] == d.id){
+                                tempDistance = outerData['link'][i]['time'];
+                                tempCount = outerData['link'][i]['count'];
+                            }
+                            else if (outerData['link'][i]['source']['id'] == d.id){
+                                tempDistance = 0;
+                                tempCount = 0;
+                            }
+                        }
+                        _this.setState({ 
+                            currentQu: data['qu'],
+                            currentDistance: tempDistance,
+                            currentCount: tempCount,
+                            currentTopic: tempTopic,
+                            currentPosRate: tempPosRate,
+                        });
+                    }, "json");
                 });
             var svg_text = svg.selectAll(".nodes")
                 .data(data['node'])
@@ -163,32 +208,32 @@ export default class Overview extends Component {
                 .style("pointer-events", "none")
                 .attr("dominant-baseline", "middle")
                 .attr("text-anchor", "middle")//在圆圈中加上数据
-                .text(function (d){return d.name;});
-            simulation.on("tick", function(){
-                svg_nodes.attr("cx", function (d) {return d.x;})
-                    .attr("cy", function(d) {return d.y;});
+                .text(function (d) { return d.name; });
+            simulation.on("tick", function () {
+                svg_nodes.attr("cx", function (d) { return d.x; })
+                    .attr("cy", function (d) { return d.y; });
                 svg_text
-                    .attr("x", function(d){
+                    .attr("x", function (d) {
                         return d.x;
                     })
-                    .attr("y", function(d){
+                    .attr("y", function (d) {
                         return d.y;
                     })
                 svg_links
-                    .attr("x1", function(d){
+                    .attr("x1", function (d) {
                         return d.source.x;
                     })
-                    .attr("y1", function(d){
+                    .attr("y1", function (d) {
                         return d.source.y;
                     })
-                    .attr("x2", function(d){
+                    .attr("x2", function (d) {
                         return d.target.x;
                     })
-                    .attr("y2", function(d){
+                    .attr("y2", function (d) {
                         return d.target.y;
                     })
             })
-            
+
             /*function dragstarted(d) {
                 if (!d3.event.active) simulation.alphaTarget(0.3).restart();
                 d.fx = d.x;
@@ -300,11 +345,6 @@ export default class Overview extends Component {
                                 columns={resColumns}
                                 dataSource={this.state.tableData}
                                 onChange={this.tableChange}
-                                onRow={(record) => ({
-                                    onClick: () => {
-                                        this.selectRow(record);
-                                    },
-                                })}
                             />
                         </div>
                         <div id="nodeLink" style={{ display: this.state.display_sider }}>
@@ -314,6 +354,22 @@ export default class Overview extends Component {
                         <Card style={{ width: 350, height: 800 }}>
                             <Divider>详细信息</Divider>
                             <p>{"选中地点：" + this.state.currentPlace}</p>
+                            <p>{"所在城区：" + this.state.currentQu}</p>
+                            <p>{"预计路程：" + this.state.currentDistance + "分钟"}</p>
+                            <p>{"直达路线数量：" + this.state.currentCount}</p>
+                            {this.state.currentTopic.map((item, index) => (
+                                <Row key={'topicScore' + String(index)}>
+                                    {topics[index] + "显著度评分：" + String((item * 10000).toFixed(2))}
+                                    &nbsp;&nbsp;
+                                    好评度：
+                                    <Progress
+                                        type="circle"
+                                        percent={Math.round(this.state.currentPosRate[index] * 100)}
+                                        width={40}
+                                    >
+                                    </Progress>
+                                </Row>
+                            ))}
                         </Card>
                     </Sider>
                 </Layout>
