@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import Button from 'antd/lib/button';
-import './overview.css';
+import './Overview.css';
 import { Layout, Menu, Card, Divider, Radio, Slider, Select, Cascader, Table, Row, Col, Form } from 'antd';
 import * as d3 from 'd3';
 import BMap from 'BMap';
@@ -15,7 +15,7 @@ const Option = Select.Option;
 
 var places = [];
 
-var means, topic = '居民区';
+var means = 'bus', topic = '居民区', place;
 function onMeansChange(e) {
     //console.log(`radio checked:${e.target.value}`);
     means = e.target.value;
@@ -23,17 +23,52 @@ function onMeansChange(e) {
 function onTopicChange(value) {
     topic = value;
 }
+const backup = () => {
+    return (
+        <div>
+            <Divider>两地关系</Divider>
+            <Form>
+                <Form.Item>
+                    两地选择：
+                    <Row>
+                        <Col span={12}>
+                            <Cascader
+                                options={places}
+                                placeholder="地点1"
+                            >
+                            </Cascader>
+                        </Col>
+                        <Col span={12}>
+                            <Cascader
+                                options={places}
+                                placeholder="地点2"
+                            >
+                            </Cascader>
+                        </Col>
+                    </Row>
+                </Form.Item>
+                <Form.Item>
+                    <Button type="primary" icon="search">查看两地公交路径</Button>
+                </Form.Item>
+            </Form>
+        </div>
+    );
+}
 export default class Overview extends Component {
     state = {
         display_sider: 'none',
         display_table: 'none',
-        tableData:[],
+        tableData: [],
         sortedInfo: null,
+        currentPlace: [],
     };
     tableChange = (pagination, filters, sorter) => {
         this.setState({
-          sortedInfo: sorter,
+            sortedInfo: sorter,
         });
+    }
+    onPlaceChange = (value, selectedOptions) => {
+        place = selectedOptions[1].label;
     }
     //load the json data
     componentWillMount() {
@@ -62,16 +97,113 @@ export default class Overview extends Component {
         var _this = this;
         var params = {
             "topic": topic
-          };
-          $.post("http://localhost:5000/viewbytopic", params, function (data, status) {
+        };
+        $.post("http://localhost:5000/viewbytopic", params, function (data, status) {
             //console.log(status);
             //console.log(data);
             if (!data || data.length == 0)
-              return;
-            _this.setState({display_sider: 'none'})
-            _this.setState({display_table: 'block'})
+                return;
+            _this.setState({ display_sider: 'none' })
+            _this.setState({ display_table: 'block' })
             _this.setState({ tableData: data['places'] });
-          }, "json");
+        }, "json");
+    }
+    onSubmitPlace = (event) => {
+        var _this = this;
+        if (typeof (place) == "undefined") {
+            alert("请选择地点！");
+            return;
+        }
+        var params = {
+            "place": place,
+            "means": means
+        };
+        $.post("http://localhost:5000/neighbor", params, function (data, status) {
+            //console.log(status);
+            console.log(data);
+            if (!data || data.length == 0)
+                return;
+            _this.setState({ display_sider: 'block' })
+            _this.setState({ display_table: 'none' })
+            d3.select('#nodeLinkSVG')
+                .remove();
+            var width = 800,
+                height = 600;
+            var svg = d3.select('#nodeLink')
+                .append('svg')
+                .attr('id', 'nodeLinkSVG')
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .attr("viewBox", "0 0 800 600");
+            var simulation = d3.forceSimulation(data['node'])
+                .force("link", d3.forceLink(data['link']).id(function (d) { return d.id }).distance(200))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+            var svg_links = svg.selectAll(".links")
+                .data(data['link'])
+                .enter()
+                .append("line")
+                .style("stroke", "black")
+                .style("stroke-width", 0.5);
+            var svg_nodes = svg.selectAll(".nodes")
+                .data(data['node'])
+                .enter()
+                .append("circle")
+                .attr("r", 20)
+                .style("fill", "steelblue")
+                .on("click", function (d, i) {
+                    _this.setState({currentPlace:d.name});
+                });
+            var svg_text = svg.selectAll(".nodes")
+                .data(data['node'])
+                .enter()
+                .append("text")
+                .style("fill", "#000")
+                .style("font-size", 8)
+                .style("cursor", "default")
+                .style("pointer-events", "none")
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "middle")//在圆圈中加上数据
+                .text(function (d){return d.name;});
+            simulation.on("tick", function(){
+                svg_nodes.attr("cx", function (d) {return d.x;})
+                    .attr("cy", function(d) {return d.y;});
+                svg_text
+                    .attr("x", function(d){
+                        return d.x;
+                    })
+                    .attr("y", function(d){
+                        return d.y;
+                    })
+                svg_links
+                    .attr("x1", function(d){
+                        return d.source.x;
+                    })
+                    .attr("y1", function(d){
+                        return d.source.y;
+                    })
+                    .attr("x2", function(d){
+                        return d.target.x;
+                    })
+                    .attr("y2", function(d){
+                        return d.target.y;
+                    })
+            })
+            
+            /*function dragstarted(d) {
+                if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            function dragged(d) {
+                d.fx = d3.event.x;
+                d.fy = d3.event.y;
+            }
+            function dragended(d) {
+                if (!d3.event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }*/
+        }, "json");
     }
     render() {
         let { sortedInfo } = this.state;
@@ -79,21 +211,21 @@ export default class Overview extends Component {
         const resColumns = [{
             title: '区域',
             dataIndex: 'name',
-          }, {
+        }, {
             title: '城区',
             dataIndex: 'qu',
-          }, {
+        }, {
             title: '主题显著度评分',
             dataIndex: 'topic',
             defaultSortOrder: 'descend',
             sorter: (a, b) => a.topic - b.topic,
             sortOrder: sortedInfo.columnKey === 'topic' && sortedInfo.order,
-          }, {
+        }, {
             title: '好评率',
             dataIndex: 'posRate',
             sorter: (a, b) => a.posRate - b.posRate,
             sortOrder: sortedInfo.columnKey === 'posRate' && sortedInfo.order,
-          }];
+        }];
         return (
             <Layout>
                 <Header className="header">
@@ -136,7 +268,7 @@ export default class Overview extends Component {
                             <div>
                                 <span>
                                     所在地点：
-                                <Cascader
+                                    <Cascader
                                         options={places}
                                         onChange={this.onPlaceChange}
                                         placeholder="请选择"
@@ -147,63 +279,41 @@ export default class Overview extends Component {
                             <br></br>
                             <div>
                                 交通方式：
-                                <Radio.Group defaultValue="a" buttonStyle="solid" onChange={onMeansChange}>
-                                    <Radio.Button value="a">公共汽车</Radio.Button>
-                                    <Radio.Button value="b">地铁</Radio.Button>
-                                    <Radio.Button value='c'>不限</Radio.Button>
+                                <Radio.Group defaultValue="bus" buttonStyle="solid" onChange={onMeansChange}>
+                                    <Radio.Button value="bus">公共汽车</Radio.Button>
+                                    <Radio.Button value="subway">地铁</Radio.Button>
+                                    <Radio.Button value='any'>不限</Radio.Button>
                                 </Radio.Group>
                             </div>
                             <br></br>
-                            <Button type="primary" icon="search">查看公交直达区域</Button>
+                            <Button type="primary" onClick={this.onSubmitPlace}>查看公交直达区域</Button>
                             <br></br>
-                            <Divider>两地关系</Divider>
-                            <Form>
-                                <Form.Item>
-                                    两地选择：
-                                    <Row>
-                                        <Col span={12}>
-                                            <Cascader
-                                                options={places}
-                                                placeholder="地点1"
-                                            >
-                                            </Cascader>
-                                        </Col>
-                                        <Col span={12}>
-                                            <Cascader
-                                                options={places}
-                                                placeholder="地点2"
-                                            >
-                                            </Cascader>
-                                        </Col>
-                                    </Row>
-                                </Form.Item>
-                                <Form.Item>
-                                    <Button type="primary" icon="search">查看两地公交路径</Button>
-                                </Form.Item>
-                            </Form>
                         </Card>
                     </Sider>
                     <Content style={{
                         background: '#fff', padding: 24, margin: 0, minHeight: 800,
                     }}>
-                        <div style={{display: this.state.display_table}}>
-                            {'各区域'+'"'+topic+'"'+'显著度/好评率概览：'}
+                        <div style={{ display: this.state.display_table }}>
+                            {'各区域' + '"' + topic + '"' + '显著度/好评率概览：'}
                             <Table
                                 //rowSelection={rowSelection}
                                 columns={resColumns}
                                 dataSource={this.state.tableData}
                                 onChange={this.tableChange}
                                 onRow={(record) => ({
-                                onClick: () => {
-                                    this.selectRow(record);
-                                },
+                                    onClick: () => {
+                                        this.selectRow(record);
+                                    },
                                 })}
                             />
                         </div>
+                        <div id="nodeLink" style={{ display: this.state.display_sider }}>
+                        </div>
                     </Content>
-                    <Sider width={350} height={800} style={{ background: '#fff', display: 'none' }}>
+                    <Sider width={350} height={800} style={{ background: '#fff', display: this.state.display_sider }}>
                         <Card style={{ width: 350, height: 800 }}>
-                            <Divider>主题</Divider>
+                            <Divider>详细信息</Divider>
+                            <p>{"选中地点：" + this.state.currentPlace}</p>
                         </Card>
                     </Sider>
                 </Layout>
